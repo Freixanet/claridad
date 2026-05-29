@@ -25,10 +25,18 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-camera",
         {
-          "cameraPermission": "Claridad necesita la cámara para fotografiar tus páginas manuscritas."
+          "cameraPermission": "Claridad needs camera access to photograph your handwritten notes and organize them by topic."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Claridad needs access to your photos to import existing pictures of your handwritten notes.",
+          "cameraPermission": "Claridad needs camera access to photograph your handwritten notes."
         }
       ]
     ],
