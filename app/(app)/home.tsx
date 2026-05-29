@@ -35,6 +35,8 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('Todos');
   const fabBottom = spacing.xl + insets.bottom;
+  const totalFragments = mockDocuments.reduce((sum, doc) => sum + doc.fragmentCount, 0);
+  const totalTopics = mockDocuments.reduce((sum, doc) => sum + doc.topicCount, 0);
 
   const fabEnter = useSharedValue(0);
   const fabScale = useSharedValue(1);
@@ -60,13 +62,17 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <AppText variant="eyebrow" style={styles.greetingEyebrow}>
-            Viernes, 29 de mayo
+            Claridad
           </AppText>
-          <AppText variant="h1">Hola, Alex 👋</AppText>
+          <AppText variant="display" style={styles.title}>
+            Biblioteca
+          </AppText>
+          <AppText variant="bodySmall" style={styles.subtitle}>
+            Documentos manuscritos organizados, revisables y listos para exportar.
+          </AppText>
         </View>
         <IconButton
           icon={Settings}
@@ -80,7 +86,24 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: spacing.xxxl + fabBottom }]}
       >
         <FadeInView>
-          <SearchBar value={search} onChangeText={setSearch} />
+          <View style={styles.librarySummary}>
+            <View>
+              <AppText variant="label" style={styles.summaryLabel}>
+                Archivo editorial
+              </AppText>
+              <AppText variant="bodySmall" style={styles.summaryCopy}>
+                {mockDocuments.length} documentos · {totalTopics} temas · {totalFragments} fragmentos
+              </AppText>
+            </View>
+            <View style={styles.statusPill}>
+              <View style={styles.statusDot} />
+              <AppText variant="label" style={styles.statusText}>
+                Revisable
+              </AppText>
+            </View>
+          </View>
+          <Spacer size="md" />
+          <SearchBar value={search} onChangeText={setSearch} variant="premium" />
         </FadeInView>
 
         <Spacer size="md" />
@@ -97,6 +120,7 @@ export default function HomeScreen() {
                 label={f}
                 active={activeFilter === f}
                 onPress={() => setActiveFilter(f)}
+                variant="premium"
               />
             ))}
           </ScrollView>
@@ -106,11 +130,11 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <AppText variant="label" style={styles.sectionLabel}>
-            {activeFilter === 'Todos' ? 'Recientes' : activeFilter}
+            {activeFilter === 'Todos' ? 'Documentos recientes' : activeFilter}
           </AppText>
           <AppText variant="caption">{filtered.length} documentos</AppText>
         </View>
-        <Spacer size="sm" />
+        <Spacer size="md" />
 
         {filtered.length > 0 ? (
           filtered.map((doc, i) => (
@@ -118,6 +142,7 @@ export default function HomeScreen() {
               <DocumentCard
                 document={doc}
                 onPress={() => router.push(`/(document)/${doc.id}`)}
+                variant="premium"
               />
             </FadeInView>
           ))
@@ -166,15 +191,64 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   headerLeft: {
-    gap: 3,
+    flex: 1,
+    gap: 5,
+    paddingRight: spacing.md,
   },
   greetingEyebrow: {
-    color: palette.text.tertiary,
+    color: palette.accent.primary,
     letterSpacing: 1,
+  },
+  title: {
+    fontSize: 34,
+    lineHeight: 38,
+    letterSpacing: -0.9,
+  },
+  subtitle: {
+    color: palette.text.secondary,
+    maxWidth: 300,
+  },
+  librarySummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.border.warm,
+    backgroundColor: '#FFFDF8',
+    padding: spacing.md,
+    ...shadows.soft,
+  },
+  summaryLabel: {
+    color: palette.text.tertiary,
+  },
+  summaryCopy: {
+    color: palette.text.primary,
+    marginTop: 3,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: palette.accent.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.accent.primary,
+  },
+  statusText: {
+    color: palette.accent.primary,
+    fontSize: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -191,6 +265,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     paddingHorizontal: spacing.xxs,
+    color: palette.text.secondary,
   },
   emptySearch: {
     paddingVertical: spacing.xl,
@@ -199,12 +274,15 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: spacing.lg,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 58,
+    height: 58,
+    borderRadius: radius.lg,
     backgroundColor: palette.accent.primary,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.fab,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
   },
 });

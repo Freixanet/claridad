@@ -17,11 +17,18 @@ type FilterChipProps = {
   label: string;
   active?: boolean;
   onPress?: () => void;
+  variant?: 'default' | 'premium';
 };
 
-export function FilterChip({ label, active = false, onPress }: FilterChipProps) {
+export function FilterChip({
+  label,
+  active = false,
+  onPress,
+  variant = 'default',
+}: FilterChipProps) {
   const progress = useSharedValue(active ? 1 : 0);
   const scale = useSharedValue(1);
+  const premium = variant === 'premium';
 
   useEffect(() => {
     progress.value = withTiming(active ? 1 : 0, {
@@ -35,12 +42,16 @@ export function FilterChip({ label, active = false, onPress }: FilterChipProps) 
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      ['rgba(91,79,214,0)', palette.accent.primary],
+      premium
+        ? ['rgba(255,253,248,0)', palette.background.elevated]
+        : ['rgba(91,79,214,0)', palette.accent.primary],
     ),
     borderColor: interpolateColor(
       progress.value,
       [0, 1],
-      [palette.border.strong, palette.accent.primary],
+      premium
+        ? [palette.border.subtle, palette.border.warm]
+        : [palette.border.strong, palette.accent.primary],
     ),
   }));
 
@@ -48,7 +59,9 @@ export function FilterChip({ label, active = false, onPress }: FilterChipProps) 
     color: interpolateColor(
       progress.value,
       [0, 1],
-      [palette.text.secondary, palette.text.inverse],
+      premium
+        ? [palette.text.secondary, palette.accent.primary]
+        : [palette.text.secondary, palette.text.inverse],
     ),
   }));
 
@@ -67,9 +80,11 @@ export function FilterChip({ label, active = false, onPress }: FilterChipProps) 
         await hapticSelection();
         onPress?.();
       }}
-      style={[styles.chip, animatedStyle]}
+      style={[styles.chip, premium && styles.premiumChip, animatedStyle]}
     >
-      <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+      <Animated.Text style={[styles.label, premium && styles.premiumLabel, labelStyle]}>
+        {label}
+      </Animated.Text>
     </AnimatedPressable>
   );
 }
@@ -83,6 +98,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  premiumChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+  },
+  premiumLabel: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });
