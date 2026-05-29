@@ -59,7 +59,7 @@ export default function TabsLayout() {
             </View>
           ),
           tabBarLabel: () => null,
-          tabBarButton: ({ ref: _ref, ...props }) => (
+          tabBarButton: ({ ref: _ref, onPress: _onPress, href: _href, ...props }) => (
             <Pressable
               {...props}
               onPress={() => {
