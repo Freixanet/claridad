@@ -10,20 +10,42 @@ type TopicSectionProps = {
   group: TopicGroup;
   showChevron?: boolean;
   index?: number;
+  variant?: 'default' | 'premium';
 };
 
 /** A single editorial topic block: colored eyebrow, title, refined fragment list. */
-export function TopicSection({ group, showChevron = false, index }: TopicSectionProps) {
+export function TopicSection({
+  group,
+  showChevron = false,
+  index,
+  variant = 'default',
+}: TopicSectionProps) {
   const colors = topicColors(group.kind);
+  const premium = variant === 'premium';
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.accent, { backgroundColor: colors.accent }]} />
-      <View style={styles.inner}>
+    <View style={[styles.card, premium && styles.premiumCard]}>
+      <View
+        style={[
+          styles.accent,
+          premium && styles.premiumAccent,
+          { backgroundColor: colors.accent },
+        ]}
+      />
+      <View style={[styles.inner, premium && styles.premiumInner]}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={[styles.tag, { backgroundColor: colors.background }]}>
-              <AppText variant="eyebrow" style={{ color: colors.accent }}>
+            <View
+              style={[
+                styles.tag,
+                premium && styles.premiumTag,
+                { backgroundColor: premium ? 'transparent' : colors.background },
+              ]}
+            >
+              <AppText
+                variant="eyebrow"
+                style={[premium && styles.premiumTagText, { color: colors.accent }]}
+              >
                 {group.title}
               </AppText>
             </View>
@@ -42,10 +64,14 @@ export function TopicSection({ group, showChevron = false, index }: TopicSection
           {group.fragments.map((fragment) => {
             const doubt = fragment.confidence === 'doubt';
             return (
-              <View key={fragment.id} style={styles.fragmentRow}>
+              <View
+                key={fragment.id}
+                style={[styles.fragmentRow, premium && styles.premiumFragmentRow]}
+              >
                 <View
                   style={[
                     styles.bullet,
+                    premium && styles.premiumBullet,
                     { backgroundColor: doubt ? palette.semantic.doubtBorder : colors.accent },
                   ]}
                 />
@@ -53,7 +79,7 @@ export function TopicSection({ group, showChevron = false, index }: TopicSection
                   {fragment.text}
                 </AppText>
                 {doubt ? (
-                  <View style={styles.doubtPill}>
+                  <View style={[styles.doubtPill, premium && styles.premiumDoubtPill]}>
                     <AppText variant="label" style={styles.doubtPillText}>
                       revisar
                     </AppText>
@@ -133,5 +159,40 @@ const styles = StyleSheet.create({
   doubtPillText: {
     color: palette.semantic.doubtText,
     fontSize: 9,
+  },
+  premiumCard: {
+    borderRadius: radius.xl,
+    backgroundColor: '#FFFDF8',
+    marginBottom: spacing.md,
+    shadowOpacity: 0.035,
+    shadowRadius: 8,
+  },
+  premiumAccent: {
+    width: 2,
+  },
+  premiumInner: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  premiumTag: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  premiumTagText: {
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  premiumFragmentRow: {
+    alignItems: 'flex-start',
+    paddingVertical: 2,
+  },
+  premiumBullet: {
+    width: 5,
+    height: 5,
+    marginTop: 8,
+  },
+  premiumDoubtPill: {
+    backgroundColor: '#FFF7E6',
+    paddingVertical: 2,
   },
 });

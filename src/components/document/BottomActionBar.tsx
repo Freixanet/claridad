@@ -24,9 +24,10 @@ type BottomActionBarProps = {
   onCopy?: () => void;
   onExport?: () => void;
   onMore?: () => void;
+  variant?: 'default' | 'premium';
 };
 
-function ActionButton({ action }: { action: ActionItem }) {
+function ActionButton({ action, premium }: { action: ActionItem; premium: boolean }) {
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -49,18 +50,28 @@ function ActionButton({ action }: { action: ActionItem }) {
         await hapticSelection();
         action.onPress?.();
       }}
-      style={[styles.action, animStyle]}
+      style={[styles.action, premium && styles.premiumAction, animStyle]}
     >
-      <action.icon color={palette.text.secondary} size={20} strokeWidth={1.75} />
-      <AppText variant="caption" style={styles.label}>
+      <action.icon
+        color={premium ? palette.text.primary : palette.text.secondary}
+        size={20}
+        strokeWidth={1.75}
+      />
+      <AppText variant="caption" style={[styles.label, premium && styles.premiumLabel]}>
         {action.label}
       </AppText>
     </AnimatedPressable>
   );
 }
 
-export function BottomActionBar({ onCopy, onExport, onMore }: BottomActionBarProps) {
+export function BottomActionBar({
+  onCopy,
+  onExport,
+  onMore,
+  variant = 'default',
+}: BottomActionBarProps) {
   const insets = useSafeAreaInsets();
+  const premium = variant === 'premium';
 
   const actions: ActionItem[] = [
     { icon: Copy, label: 'Copiar', onPress: onCopy },
@@ -69,9 +80,15 @@ export function BottomActionBar({ onCopy, onExport, onMore }: BottomActionBarPro
   ];
 
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.xs }]}>
+    <View
+      style={[
+        styles.bar,
+        premium && styles.premiumBar,
+        { paddingBottom: insets.bottom + spacing.xs },
+      ]}
+    >
       {actions.map((action) => (
-        <ActionButton key={action.label} action={action} />
+        <ActionButton key={action.label} action={action} premium={premium} />
       ))}
     </View>
   );
@@ -96,5 +113,21 @@ const styles = StyleSheet.create({
   },
   label: {
     color: palette.text.secondary,
+  },
+  premiumBar: {
+    backgroundColor: '#FFFDF8',
+    borderTopColor: palette.border.warm,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+  },
+  premiumAction: {
+    paddingVertical: 9,
+    borderRadius: radius.md,
+  },
+  premiumLabel: {
+    color: palette.text.secondary,
+    fontSize: 12,
   },
 });

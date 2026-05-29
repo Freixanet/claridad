@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,19 +40,25 @@ export default function ResultScreen() {
           accessibilityLabel="Volver"
           onPress={() => router.back()}
         />
-        <AppText variant="h3">Resultado</AppText>
         <View style={styles.readyBadge}>
-          <Sparkles color={palette.semantic.successText} size={12} strokeWidth={2.5} />
+          <ShieldCheck color={palette.accent.primary} size={14} strokeWidth={2.2} />
           <AppText variant="label" style={styles.readyText}>
-            Listo
+            Listo para revisar
           </AppText>
         </View>
       </View>
 
       <View style={styles.summary}>
-        <AppText variant="bodySmall">
-          {featuredDocument.topicCount} temas · {fragmentTotal} fragmentos · fiel a tu
-          escritura
+        <AppText variant="eyebrow" style={styles.summaryEyebrow}>
+          Resultado
+        </AppText>
+        <Spacer size="xs" />
+        <AppText variant="display" style={styles.summaryTitle}>
+          Documento organizado.
+        </AppText>
+        <Spacer size="xs" />
+        <AppText variant="bodySmall" style={styles.summaryCopy}>
+          {featuredDocument.topicCount} temas · {fragmentTotal} fragmentos · fiel a tu escritura
         </AppText>
       </View>
 
@@ -62,6 +68,7 @@ export default function ResultScreen() {
           options={['Organizado', 'Original']}
           value={tab}
           onChange={setTab}
+          variant="premium"
         />
       </View>
 
@@ -76,15 +83,15 @@ export default function ResultScreen() {
             <Pressable style={styles.sourceStrip} onPress={() => setTab('Original')}>
               <PaperSheet padded={false} floating={false} style={styles.sourceThumb}>
                 <View style={styles.sourceThumbPad}>
-                  <HandwrittenPageMock lines={5} compact />
+                  <HandwrittenPageMock lines={7} compact tone="aged" />
                 </View>
               </PaperSheet>
               <View style={styles.sourceCopy}>
                 <AppText variant="eyebrow" style={styles.sourceEyebrow}>
-                  Del caos al orden
+                  Fuente manuscrita
                 </AppText>
                 <AppText variant="bodySmall">
-                  Organizado desde tu página manuscrita
+                  Conservamos intención y marcamos incertidumbre.
                 </AppText>
               </View>
               <AppText variant="label" style={styles.sourceLink}>
@@ -96,14 +103,15 @@ export default function ResultScreen() {
 
             {featuredDocument.topics.map((group, i) => (
               <FadeInView key={group.id} delay={i * 90}>
-                <TopicSection group={group} index={i} showChevron />
+                <TopicSection group={group} index={i} showChevron variant="premium" />
               </FadeInView>
             ))}
 
             <Spacer size="xs" />
-            <TrustBadge message={trustCopy.markDoubtful} />
-            <Spacer size="sm" />
-            <TrustBadge message={trustCopy.reviewBeforeExport} />
+            <View style={styles.trustPanel}>
+              <TrustBadge message={trustCopy.markDoubtful} />
+              <TrustBadge message={trustCopy.reviewBeforeExport} />
+            </View>
           </FadeInView>
         ) : (
           <FadeInView key="original" fromOpacity={0.5} offsetY={0} duration={180}>
@@ -124,6 +132,7 @@ export default function ResultScreen() {
       <BottomActionBar
         onExport={() => router.push(ClaridadRoutes.export)}
         onMore={() => router.push(ClaridadRoutes.review)}
+        variant="premium"
       />
     </SafeAreaView>
   );
@@ -144,19 +153,31 @@ const styles = StyleSheet.create({
   readyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: palette.semantic.success,
+    gap: 6,
+    backgroundColor: palette.accent.primarySoft,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   readyText: {
-    color: palette.semantic.successText,
+    color: palette.accent.primary,
+    fontSize: 10,
   },
   summary: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  summaryEyebrow: {
+    color: palette.accent.primary,
+  },
+  summaryTitle: {
+    fontSize: 32,
+    lineHeight: 37,
+    letterSpacing: -0.9,
+  },
+  summaryCopy: {
+    color: palette.text.secondary,
   },
   tabs: {
     paddingHorizontal: spacing.lg,
@@ -173,21 +194,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: palette.background.paper,
-    borderRadius: radius.lg,
+    backgroundColor: '#FFFDF8',
+    borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.border.warm,
     padding: spacing.sm,
+    marginBottom: spacing.xs,
   },
   sourceThumb: {
-    width: 48,
-    height: 56,
-    borderRadius: radius.sm,
+    width: 60,
+    height: 74,
+    borderRadius: radius.md,
   },
   sourceThumbPad: {
     flex: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     justifyContent: 'center',
   },
   sourceCopy: {
@@ -202,5 +224,8 @@ const styles = StyleSheet.create({
   },
   originalEyebrow: {
     color: palette.text.secondary,
+  },
+  trustPanel: {
+    gap: spacing.sm,
   },
 });

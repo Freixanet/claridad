@@ -19,12 +19,19 @@ type SegmentedControlProps = {
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  variant?: 'default' | 'premium';
 };
 
-export function SegmentedControl({ options, value, onChange }: SegmentedControlProps) {
+export function SegmentedControl({
+  options,
+  value,
+  onChange,
+  variant = 'default',
+}: SegmentedControlProps) {
   const [trackWidth, setTrackWidth] = useState(0);
   const index = options.indexOf(value);
   const position = useSharedValue(index < 0 ? 0 : index);
+  const premium = variant === 'premium';
 
   useEffect(() => {
     position.value = withTiming(index < 0 ? 0 : index, {
@@ -46,8 +53,10 @@ export function SegmentedControl({ options, value, onChange }: SegmentedControlP
   const onLayout = (e: LayoutChangeEvent) => setTrackWidth(e.nativeEvent.layout.width);
 
   return (
-    <View style={styles.track} onLayout={onLayout}>
-      {tabWidth > 0 ? <Animated.View style={[styles.thumb, thumbStyle]} /> : null}
+    <View style={[styles.track, premium && styles.premiumTrack]} onLayout={onLayout}>
+      {tabWidth > 0 ? (
+        <Animated.View style={[styles.thumb, premium && styles.premiumThumb, thumbStyle]} />
+      ) : null}
       {options.map((option) => {
         const active = option === value;
         return (
@@ -61,7 +70,12 @@ export function SegmentedControl({ options, value, onChange }: SegmentedControlP
           >
             <AppText
               variant="bodySmall"
-              style={[styles.label, active && styles.labelActive]}
+              style={[
+                styles.label,
+                active && styles.labelActive,
+                premium && styles.premiumLabel,
+                premium && active && styles.premiumLabelActive,
+              ]}
             >
               {option}
             </AppText>
@@ -102,5 +116,22 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: palette.text.inverse,
+  },
+  premiumTrack: {
+    backgroundColor: palette.background.paper,
+    borderColor: palette.border.warm,
+    borderRadius: radius.lg,
+  },
+  premiumThumb: {
+    backgroundColor: '#FFFDF8',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.border.warm,
+  },
+  premiumLabel: {
+    fontSize: 13,
+    color: palette.text.secondary,
+  },
+  premiumLabelActive: {
+    color: palette.accent.primary,
   },
 });
