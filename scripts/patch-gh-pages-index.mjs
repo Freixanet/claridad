@@ -16,6 +16,23 @@ const inject = `
     <meta property="og:title" content="Claridad" />
     <meta property="og:description" content="Del caos al orden. Prototipo navegable premium." />
     <style id="claridad-gh-pages">
+      @media (max-width: 519px) {
+        html, body, #root {
+          height: 100%;
+        }
+        body {
+          background: #ffffff !important;
+          overflow: hidden !important;
+        }
+        #root {
+          width: 100% !important;
+          max-width: none !important;
+          height: 100% !important;
+          min-height: 100% !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+      }
       @media (min-width: 520px) {
         html, body { height: 100%; }
         body {

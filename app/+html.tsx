@@ -17,7 +17,12 @@ export default function Root({ children }: PropsWithChildren) {
               }
               body {
                 margin: 0;
-                background: #111827;
+                background: #ffffff;
+              }
+              @media (min-width: 520px) {
+                body {
+                  background: #111827;
+                }
               }
             `,
           }}
