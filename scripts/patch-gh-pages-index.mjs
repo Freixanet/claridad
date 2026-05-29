@@ -63,5 +63,12 @@ if (!html.includes('claridad-gh-pages')) {
   html = html.replace('</head>', `${inject}</head>`);
 }
 
+if (!html.includes('apple-touch-icon')) {
+  html = html.replace(
+    '</head>',
+    '<link rel="apple-touch-icon" sizes="180x180" href="/claridad/apple-touch-icon.png" /></head>'
+  );
+}
+
 fs.writeFileSync(indexPath, html);
 console.log('Patched dist/index.html for GitHub Pages');
