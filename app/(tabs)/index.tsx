@@ -26,6 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import ClaridadLogo from '@/components/ClaridadLogo';
 
 type DocumentRow = {
   id: number;
@@ -435,27 +436,7 @@ export default function LibraryScreen() {
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                backgroundColor: colors.foreground,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: 'Inter_700Bold',
-                  color: '#FFFFFF',
-                  fontSize: 14,
-                  letterSpacing: -0.4,
-                }}
-              >
-                C
-              </Text>
-            </View>
+            <ClaridadLogo size={28} />
             <Text
               style={{
                 fontFamily: 'Inter_600SemiBold',
