@@ -7,7 +7,7 @@ import { Check, Loader, Sparkles, Layers, FileText, ShieldCheck } from 'lucide-r
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
 import { apiFetch } from '@/api/client';
-import { consumePendingCaptureUri } from '@/services/pendingCapture';
+import { useCaptureFlow } from '@/context/CaptureFlowContext';
 
 type Stage = {
   key: string;
@@ -46,6 +46,7 @@ const STAGES: Stage[] = [
 export default function ProcessingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { takeCaptureUri } = useCaptureFlow();
   const params = useLocalSearchParams<{ image?: string; session?: string }>();
 
   const resolveParam = (value: string | string[] | undefined): string => {
@@ -65,7 +66,7 @@ export default function ProcessingScreen() {
   // can clear an eager consume in useState before processing runs).
   useFocusEffect(
     useCallback(() => {
-      const fromStore = consumePendingCaptureUri();
+      const fromStore = takeCaptureUri();
       const fromParams = resolveParam(params.image);
       const uri = fromStore || fromParams;
       if (!uri) return;
@@ -75,7 +76,7 @@ export default function ProcessingScreen() {
       setActiveStage(0);
       setCompletedStages([]);
       submittedRef.current = false;
-    }, [params.image, params.session])
+    }, [params.image, params.session, takeCaptureUri])
   );
 
   useEffect(() => {

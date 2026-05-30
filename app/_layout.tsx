@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setupMockApi } from '@/api/setupMockApi';
 import FontLoader from '@/components/FontLoader';
 import MobilePreviewFrame from '@/components/MobilePreviewFrame';
+import { CaptureFlowProvider } from '@/context/CaptureFlowContext';
 
 setupMockApi();
 
@@ -28,33 +29,35 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <FontLoader>
-          <MobilePreviewFrame>
-            <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-              <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: '#FFFFFF' },
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="capture"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen name="processing" options={{ animation: 'fade' }} />
-                <Stack.Screen name="document/[id]" options={{ animation: 'slide_from_right' }} />
-                <Stack.Screen
-                  name="review/[id]"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen
-                  name="export/[id]"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-              </Stack>
-            </GestureHandlerRootView>
-          </MobilePreviewFrame>
+          <CaptureFlowProvider>
+            <MobilePreviewFrame>
+              <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+                <StatusBar style="dark" />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: '#FFFFFF' },
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="capture"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                  <Stack.Screen name="processing" options={{ animation: 'fade' }} />
+                  <Stack.Screen name="document/[id]" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen
+                    name="review/[id]"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                  <Stack.Screen
+                    name="export/[id]"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                </Stack>
+              </GestureHandlerRootView>
+            </MobilePreviewFrame>
+          </CaptureFlowProvider>
         </FontLoader>
       </SafeAreaProvider>
     </QueryClientProvider>

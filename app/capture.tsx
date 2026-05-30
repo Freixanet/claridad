@@ -26,8 +26,9 @@ import {
 } from 'lucide-react-native';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import { useCaptureFlow } from '@/context/CaptureFlowContext';
 import useUpload from '@/utils/useUpload';
-import { setPendingCaptureUri } from '@/services/pendingCapture';
+import { goToProcessingScreen } from '@/utils/goToProcessing';
 
 type Step = 'intent' | 'preview';
 
@@ -38,6 +39,7 @@ export default function CaptureScreen() {
   const [selectedAsset, setSelectedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [upload] = useUpload();
+  const { stashCaptureUri } = useCaptureFlow();
   const submittingRef = useRef(false);
 
   const pickFromCamera = useCallback(async () => {
@@ -92,21 +94,39 @@ export default function CaptureScreen() {
     if (!selectedAsset || submittingRef.current) return;
     submittingRef.current = true;
     setBusy(true);
+    let imageUri: string;
     try {
       const uploaded = await upload({ reactNativeAsset: selectedAsset });
       if ('error' in uploaded || !uploaded.url) {
         throw new Error(uploaded.error ?? 'Upload failed');
       }
-      setPendingCaptureUri(uploaded.url);
-      // Session param helps processing remount when the screen was already visited.
-      router.replace(`/processing?session=${Date.now()}`);
+      imageUri = uploaded.url;
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload failed', error instanceof Error ? error.message : 'Please try again.');
       setBusy(false);
       submittingRef.current = false;
+      return;
     }
-  }, [selectedAsset, upload, router]);
+
+    // Drop the asset from React state before navigation so persistence does not
+    // call native setItem with a huge serialized capture payload.
+    setSelectedAsset(null);
+    setStep('intent');
+    stashCaptureUri(imageUri);
+
+    try {
+      await goToProcessingScreen(router);
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert(
+        'Could not continue',
+        'Your photo is ready, but navigation failed. Please try again.'
+      );
+      setBusy(false);
+      submittingRef.current = false;
+    }
+  }, [selectedAsset, upload, router, stashCaptureUri]);
 
   const handleClose = useCallback(() => {
     router.back();
