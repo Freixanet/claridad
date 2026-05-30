@@ -16,8 +16,10 @@ function jsonResponse(data: unknown, status = 200): Response {
 function parseApiPath(url: string): { path: string; searchParams: URLSearchParams } | null {
   try {
     const parsed = new URL(url, 'http://localhost');
-    if (!parsed.pathname.startsWith('/api/documents')) return null;
-    return { path: parsed.pathname, searchParams: parsed.searchParams };
+    // Web export may prefix routes with experiments.baseUrl (e.g. /claridad).
+    const path = parsed.pathname.replace(/^\/claridad(?=\/|$)/, '') || '/';
+    if (!path.startsWith('/api/documents')) return null;
+    return { path, searchParams: parsed.searchParams };
   } catch {
     return null;
   }

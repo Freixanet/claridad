@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { Check, Loader, Sparkles, Layers, FileText, ShieldCheck } from 'lucide-react-native';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import { apiFetch } from '@/api/client';
 import { consumePendingCaptureUri } from '@/services/pendingCapture';
 
 type Stage = {
@@ -45,21 +46,37 @@ const STAGES: Stage[] = [
 export default function ProcessingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ image?: string }>();
-  const [imageUrl] = useState(() => {
-    const fromStore = consumePendingCaptureUri();
-    if (fromStore) return fromStore;
-    const fromParams = params.image;
-    if (typeof fromParams === 'string') return fromParams;
-    if (Array.isArray(fromParams) && fromParams[0]) return fromParams[0];
-    return '';
-  });
+  const params = useLocalSearchParams<{ image?: string; session?: string }>();
 
+  const resolveParam = (value: string | string[] | undefined): string => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && value[0]) return value[0];
+    return '';
+  };
+
+  const [imageUrl, setImageUrl] = useState('');
   const [activeStage, setActiveStage] = useState(0);
   const [completedStages, setCompletedStages] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const submittedRef = useRef(false);
+
+  // Pick up the capture URI when the screen is shown (native remounts / Strict Mode
+  // can clear an eager consume in useState before processing runs).
+  useFocusEffect(
+    useCallback(() => {
+      const fromStore = consumePendingCaptureUri();
+      const fromParams = resolveParam(params.image);
+      const uri = fromStore || fromParams;
+      if (!uri) return;
+
+      setImageUrl(uri);
+      setError(null);
+      setActiveStage(0);
+      setCompletedStages([]);
+      submittedRef.current = false;
+    }, [params.image, params.session])
+  );
 
   useEffect(() => {
     Animated.loop(
@@ -100,7 +117,7 @@ export default function ProcessingScreen() {
 
     (async () => {
       try {
-        const res = await fetch('/api/documents/process', {
+        const res = await apiFetch('/api/documents/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image_url: imageUrl }),
@@ -130,6 +147,16 @@ export default function ProcessingScreen() {
       }
     })();
   }, [imageUrl, router]);
+
+  useEffect(() => {
+    if (imageUrl || error) return;
+    const timer = setTimeout(() => {
+      if (!imageUrl && !submittedRef.current) {
+        setError('No encontramos la foto capturada. Vuelve a capturar la página.');
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [imageUrl, error, params.session]);
 
   const pulseOpacity = pulseAnim.interpolate({
     inputRange: [0, 1],

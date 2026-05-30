@@ -98,7 +98,8 @@ export default function CaptureScreen() {
         throw new Error(uploaded.error ?? 'Upload failed');
       }
       setPendingCaptureUri(uploaded.url);
-      router.replace('/processing');
+      // Session param helps processing remount when the screen was already visited.
+      router.replace(`/processing?session=${Date.now()}`);
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload failed', error instanceof Error ? error.message : 'Please try again.');
