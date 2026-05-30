@@ -27,6 +27,7 @@ import {
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
 import useUpload from '@/utils/useUpload';
+import { setPendingCaptureUri } from '@/services/pendingCapture';
 
 type Step = 'intent' | 'preview';
 
@@ -96,7 +97,8 @@ export default function CaptureScreen() {
       if ('error' in uploaded || !uploaded.url) {
         throw new Error(uploaded.error ?? 'Upload failed');
       }
-      router.replace(`/processing?image=${encodeURIComponent(uploaded.url)}`);
+      setPendingCaptureUri(uploaded.url);
+      router.replace('/processing');
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload failed', error instanceof Error ? error.message : 'Please try again.');

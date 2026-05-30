@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { Check, Loader, Sparkles, Layers, FileText, ShieldCheck } from 'lucide-react-native';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import { consumePendingCaptureUri } from '@/services/pendingCapture';
 
 type Stage = {
   key: string;
@@ -45,7 +46,14 @@ export default function ProcessingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ image?: string }>();
-  const imageUrl = params.image ?? '';
+  const [imageUrl] = useState(() => {
+    const fromStore = consumePendingCaptureUri();
+    if (fromStore) return fromStore;
+    const fromParams = params.image;
+    if (typeof fromParams === 'string') return fromParams;
+    if (Array.isArray(fromParams) && fromParams[0]) return fromParams[0];
+    return '';
+  });
 
   const [activeStage, setActiveStage] = useState(0);
   const [completedStages, setCompletedStages] = useState<number[]>([]);
