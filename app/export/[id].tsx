@@ -5,17 +5,24 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Share,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
 import { X, FileText, FileDown, Share2, Check, Hash } from 'lucide-react-native';
-import { colors, radii, categoryMeta } from '@/constants/theme';
+import { colors, radii } from '@/constants/theme';
+import { useCustomTopics } from '@/hooks/useCustomTopics';
+import { getTopicMeta } from '@/utils/topicCatalog';
 import Pill from '@/components/Pill';
+import { copyTextToClipboard } from '@/utils/copyToClipboard';
+import { exportDocumentPdf } from '@/utils/exportDocumentPdf';
+import { shareContent } from '@/utils/shareContent';
+import { goBackOr } from '@/utils/navigation';
+import { usePlanMode } from '@/hooks/usePlanMode';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 type Section = {
   id: string;
@@ -36,9 +43,12 @@ type DocumentDetail = {
 export default function ExportScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
+  const { isPro } = usePlanMode();
   const params = useLocalSearchParams<{ id: string }>();
   const docId = params.id;
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const { data, isLoading } = useQuery<{ document: DocumentDetail }>({
     queryKey: ['document', docId],
@@ -51,12 +61,13 @@ export default function ExportScreen() {
   });
 
   const doc = data?.document;
+  const { catalog } = useCustomTopics();
 
   const markdown = useMemo(() => {
     if (!doc) return '';
     const lines: string[] = [`# ${doc.title}`, ''];
     doc.sections.forEach((s) => {
-      const meta = categoryMeta[s.category] ?? categoryMeta.other;
+      const meta = getTopicMeta(s.category, catalog);
       lines.push(`## ${s.title}`);
       lines.push(`*${meta.label}*`);
       lines.push('');
@@ -70,7 +81,7 @@ export default function ExportScreen() {
       }
     });
     return lines.join('\n');
-  }, [doc]);
+  }, [catalog, doc]);
 
   const plainText = useMemo(() => {
     if (!doc) return '';
@@ -98,22 +109,77 @@ export default function ExportScreen() {
   }, []);
 
   const handleCopyMd = useCallback(async () => {
-    await Clipboard.setStringAsync(markdown);
+    const copied = await copyTextToClipboard(markdown);
+    if (!copied) {
+      Alert.alert('No se pudo copiar', 'Prueba Export → Share en su lugar.');
+      return;
+    }
     showFeedback('Markdown copied');
   }, [markdown, showFeedback]);
 
   const handleCopyText = useCallback(async () => {
-    await Clipboard.setStringAsync(plainText);
+    const copied = await copyTextToClipboard(plainText);
+    if (!copied) {
+      Alert.alert('No se pudo copiar', 'Prueba Export → Share en su lugar.');
+      return;
+    }
     showFeedback('Plain text copied');
   }, [plainText, showFeedback]);
 
   const handleShare = useCallback(async () => {
-    try {
-      await Share.share({ message: plainText, title: doc?.title });
-    } catch (e) {
-      console.error(e);
+    const result = await shareContent({ title: doc?.title, message: plainText });
+
+    if (result === 'shared') {
+      showFeedback('Share sheet opened');
+      return;
     }
-  }, [plainText, doc?.title]);
+    if (result === 'copied') {
+      showFeedback('Copied — paste to share');
+      return;
+    }
+    if (result === 'cancelled') return;
+
+    Alert.alert('Could not share', 'Try Copy as plain text instead.');
+  }, [plainText, doc?.title, showFeedback]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!doc || exportingPdf) return;
+
+    if (!isPro) {
+      Alert.alert('Claridad Pro', 'PDF export is available on Claridad Pro. Enable Preview Pro in Settings.');
+      return;
+    }
+
+    setExportingPdf(true);
+    try {
+      const result = await exportDocumentPdf({
+        title: doc.title,
+        sections: doc.sections,
+      });
+
+      if (result === 'saved_and_opened') {
+        showFeedback(
+          Platform.OS === 'ios'
+            ? 'PDF saved to Files › Claridad and opened'
+            : 'PDF saved and opened'
+        );
+      } else if (result === 'shared') {
+        showFeedback('Share sheet opened');
+      } else if (result === 'downloaded') {
+        showFeedback('PDF downloaded and opened');
+      } else if (result === 'opened') {
+        showFeedback('PDF opened — tap Share in the viewer to save on iPhone');
+      } else if (result === 'saved') {
+        showFeedback('PDF saved to Files › Claridad');
+      } else if (result === 'cancelled') {
+        return;
+      } else {
+        Alert.alert('Export failed', 'Could not generate the PDF. Try again.');
+      }
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [doc, exportingPdf, isPro, showFeedback]);
 
   if (isLoading || !doc) {
     return (
@@ -185,7 +251,7 @@ export default function ExportScreen() {
           Export
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, `/document/${docId}`)}
           hitSlop={10}
           style={({ pressed }) => ({
             width: 36,
@@ -203,6 +269,7 @@ export default function ExportScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
@@ -309,34 +376,45 @@ export default function ExportScreen() {
           ))}
         </View>
 
-        {/* PDF placeholder */}
-        <View
-          style={{
+        {/* PDF */}
+        <Pressable
+          onPress={() => void handleExportPdf()}
+          disabled={exportingPdf}
+          style={({ pressed }) => ({
             marginTop: 14,
-            backgroundColor: colors.canvasMuted,
+            backgroundColor: isPro
+              ? pressed
+                ? colors.canvasMuted
+                : colors.background
+              : colors.canvasMuted,
             borderRadius: radii.md,
             borderWidth: 1,
             borderColor: colors.borderGhost,
-            borderStyle: 'dashed',
+            borderStyle: isPro ? 'solid' : 'dashed',
             padding: 16,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 12,
-          }}
+            opacity: isPro ? 1 : 0.92,
+          })}
         >
           <View
             style={{
               width: 36,
               height: 36,
               borderRadius: 10,
-              backgroundColor: colors.background,
+              backgroundColor: isPro ? colors.canvasMuted : colors.background,
               borderWidth: 1,
               borderColor: colors.borderGhost,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <FileDown color={colors.foregroundMuted} size={16} strokeWidth={2.2} />
+            {exportingPdf ? (
+              <ActivityIndicator size="small" color={colors.foregroundMuted} />
+            ) : (
+              <FileDown color={isPro ? colors.foreground : colors.foregroundMuted} size={16} strokeWidth={2.2} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text
@@ -357,11 +435,11 @@ export default function ExportScreen() {
                 marginTop: 2,
               }}
             >
-              Available on Claridad Pro
+              {isPro ? 'Download a polished PDF of this document' : 'Available on Claridad Pro'}
             </Text>
           </View>
-          <Pill label="Pro" variant="soft" />
-        </View>
+          <Pill label={exportingPdf ? '…' : isPro ? 'Download' : 'Pro'} variant="soft" />
+        </Pressable>
 
         {/* Preview */}
         <Text

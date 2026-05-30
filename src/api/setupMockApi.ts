@@ -23,8 +23,51 @@ function parseApiPath(url: string): { path: string; searchParams: URLSearchParam
   }
 }
 
+async function readJsonFetchBody(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<{ body: Record<string, unknown>; rawBody: string | null; bodySource: string }> {
+  if (init?.body) {
+    const rawBody =
+      typeof init.body === 'string'
+        ? init.body
+        : init.body instanceof URLSearchParams
+          ? init.body.toString()
+          : String(init.body);
+    return {
+      body: JSON.parse(rawBody) as Record<string, unknown>,
+      rawBody,
+      bodySource: 'init.body',
+    };
+  }
+
+  if (typeof input !== 'string' && !(input instanceof URL)) {
+    const request = input as Request;
+    if (request.body) {
+      const rawBody = await request.clone().text();
+      if (rawBody) {
+        return {
+          body: JSON.parse(rawBody) as Record<string, unknown>,
+          rawBody,
+          bodySource: 'request.body',
+        };
+      }
+    }
+  }
+
+  return { body: {}, rawBody: null, bodySource: 'none' };
+}
+
+function isInAppDocumentsRequest(url: string): boolean {
+  // Only mock relative in-app routes (same origin as the Expo app).
+  // Absolute URLs (e.g. http://192.168.1.16:3000/...) must reach the real dev/prod API.
+  return url.startsWith('/api/documents');
+}
+
 async function handleMockFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response | null> {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (!isInAppDocumentsRequest(url)) return null;
+
   const api = parseApiPath(url);
   if (!api) return null;
 
@@ -50,13 +93,22 @@ async function handleMockFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   }
 
   if (api.path === '/api/documents/process' && method === 'POST') {
-    const body = init?.body ? JSON.parse(String(init.body)) : {};
-    const imageUrl = body.image_url as string | undefined;
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await readJsonFetchBody(input, init)).body;
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400);
+    }
+    const imageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : '';
     if (!imageUrl) return jsonResponse({ error: 'image_url is required' }, 400);
 
-    await new Promise((r) => setTimeout(r, 1200));
-    const document = processDocument(imageUrl);
-    return jsonResponse({ document });
+    try {
+      const document = await processDocument(imageUrl);
+      return jsonResponse({ document });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Processing failed';
+      return jsonResponse({ error: message }, 502);
+    }
   }
 
   const idMatch = api.path.match(/^\/api\/documents\/(\d+)$/);

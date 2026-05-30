@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { View, Text, ViewStyle } from 'react-native';
 import { colors, radii } from '@/constants/theme';
 
@@ -7,11 +8,19 @@ type PillProps = {
   label: string;
   variant?: Variant;
   dotColor?: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   style?: ViewStyle;
+  textSelectable?: boolean;
 };
 
-export default function Pill({ label, variant = 'outline', dotColor, icon, style }: PillProps) {
+export default function Pill({
+  label,
+  variant = 'outline',
+  dotColor,
+  icon,
+  style,
+  textSelectable = true,
+}: PillProps) {
   const base: ViewStyle = {
     flexDirection: 'row',
     alignItems: 'center',
@@ -27,6 +36,7 @@ export default function Pill({ label, variant = 'outline', dotColor, icon, style
       <View style={[base, { backgroundColor: colors.primarySoft }, style]}>
         {icon}
         <Text
+          selectable={textSelectable}
           style={{
             fontFamily: 'Inter_500Medium',
             fontSize: 12,
@@ -64,6 +74,7 @@ export default function Pill({ label, variant = 'outline', dotColor, icon, style
       ) : null}
       {icon}
       <Text
+        selectable={textSelectable}
         style={{
           fontFamily: 'Inter_500Medium',
           fontSize: 12,

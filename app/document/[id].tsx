@@ -24,9 +24,14 @@ import {
   Copy,
   CheckCircle2,
 } from 'lucide-react-native';
-import * as Clipboard from 'expo-clipboard';
-import { colors, radii, categoryMeta } from '@/constants/theme';
+import { colors, radii } from '@/constants/theme';
+import { useCustomTopics } from '@/hooks/useCustomTopics';
+import { getTopicMeta } from '@/utils/topicCatalog';
 import Pill from '@/components/Pill';
+import OrganizedSectionList from '@/components/OrganizedSectionList';
+import { copyTextToClipboard } from '@/utils/copyToClipboard';
+import { goBackOr } from '@/utils/navigation';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 type Section = {
   id: string;
@@ -64,95 +69,10 @@ function formatDate(iso: string): string {
   }
 }
 
-function SectionBlock({ section, index }: { section: Section; index: number }) {
-  const meta = categoryMeta[section.category] ?? categoryMeta.other;
-  const hasItems = Array.isArray(section.items) && section.items.length > 0;
-  const hasContent = section.content && section.content.trim().length > 0;
-
-  return (
-    <View
-      style={{
-        backgroundColor: colors.background,
-        borderRadius: radii.md,
-        borderWidth: 1,
-        borderColor: colors.borderGhost,
-        padding: 18,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pill label={meta.label} dotColor={meta.dot} />
-          <Text
-            style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: colors.foregroundSoft }}
-          >
-            {String(index + 1).padStart(2, '0')}
-          </Text>
-        </View>
-      </View>
-
-      <Text
-        style={{
-          fontFamily: 'Inter_600SemiBold',
-          fontSize: 18,
-          color: colors.foreground,
-          letterSpacing: -0.3,
-          marginTop: 12,
-          lineHeight: 24,
-        }}
-      >
-        {section.title}
-      </Text>
-
-      {hasContent ? (
-        <Text
-          style={{
-            fontFamily: 'Inter_400Regular',
-            fontSize: 14,
-            color: '#374151',
-            marginTop: 10,
-            lineHeight: 22,
-          }}
-        >
-          {section.content}
-        </Text>
-      ) : null}
-
-      {hasItems ? (
-        <View style={{ marginTop: hasContent ? 12 : 10, gap: 6 }}>
-          {section.items.map((item, idx) => (
-            <View key={`${section.id}-${idx}`} style={{ flexDirection: 'row' }}>
-              <Text
-                style={{
-                  fontFamily: 'Inter_400Regular',
-                  fontSize: 14,
-                  color: colors.foregroundSoft,
-                  width: 16,
-                }}
-              >
-                -
-              </Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontFamily: 'Inter_400Regular',
-                  fontSize: 14,
-                  color: '#374151',
-                  lineHeight: 21,
-                }}
-              >
-                {item}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 export default function DocumentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ id: string; fresh?: string }>();
   const docId = params.id;
@@ -212,11 +132,13 @@ export default function DocumentScreen() {
     ]);
   }, [deleteMutation]);
 
+  const { catalog } = useCustomTopics();
+
   const markdown = useMemo(() => {
     if (!doc) return '';
     const lines: string[] = [`# ${doc.title}`, ''];
     doc.sections.forEach((s) => {
-      const meta = categoryMeta[s.category] ?? categoryMeta.other;
+      const meta = getTopicMeta(s.category, catalog);
       lines.push(`## ${s.title}`);
       lines.push(`*${meta.label}*`);
       lines.push('');
@@ -230,13 +152,21 @@ export default function DocumentScreen() {
       }
     });
     return lines.join('\n');
-  }, [doc]);
+  }, [catalog, doc]);
 
   const handleCopy = useCallback(async () => {
     if (!markdown) return;
-    await Clipboard.setStringAsync(markdown);
-    if (Platform.OS !== 'web')
+    const copied = await copyTextToClipboard(markdown);
+    if (!copied) {
+      Alert.alert(
+        'No se pudo copiar',
+        'En Safari sobre http:// no está disponible el portapapeles. Usa Export → Share.'
+      );
+      return;
+    }
+    if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
     setJustCopied(true);
     setTimeout(() => setJustCopied(false), 1800);
   }, [markdown]);
@@ -308,7 +238,7 @@ export default function DocumentScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/')}
           hitSlop={10}
           style={({ pressed }) => ({
             width: 36,
@@ -396,6 +326,7 @@ export default function DocumentScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -630,9 +561,7 @@ export default function DocumentScreen() {
               </Text>
             </View>
           ) : (
-            doc.sections.map((section, idx) => (
-              <SectionBlock key={section.id || idx} section={section} index={idx} />
-            ))
+            <OrganizedSectionList sections={doc.sections} animateEntrance={isFresh} />
           )}
         </View>
 

@@ -25,6 +25,10 @@ function useUpload(): [(input: UploadInput) => Promise<UploadResult>, UploadHook
       if (!asset.uri) {
         throw new Error('No image selected');
       }
+      if (asset.base64) {
+        const mimeType = asset.mimeType ?? 'image/jpeg';
+        return { url: `data:${mimeType};base64,${asset.base64}`, mimeType };
+      }
       return { url: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' };
     } catch (uploadError) {
       if (uploadError instanceof Error) {

@@ -1,9 +1,8 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
+import Constants from 'expo-constants';
 import type { PropsWithChildren } from 'react';
 
-import app from '../app.json';
-
-const basePath = app.expo.experiments?.baseUrl?.replace(/\/$/, '') ?? '';
+const basePath = Constants.expoConfig?.experiments?.baseUrl?.replace(/\/$/, '') ?? '';
 
 export default function Root({ children }: PropsWithChildren) {
   return (
@@ -27,6 +26,29 @@ export default function Root({ children }: PropsWithChildren) {
               body {
                 margin: 0;
                 background: #ffffff;
+                -webkit-tap-highlight-color: transparent;
+              }
+              .library-doc-card,
+              .library-doc-card * {
+                -webkit-user-select: none !important;
+                user-select: none !important;
+                -webkit-touch-callout: none !important;
+              }
+              .library-doc-card img {
+                -webkit-user-drag: none;
+                pointer-events: none;
+              }
+              body.claridad-no-select,
+              body.claridad-no-select *:not(input):not(textarea) {
+                -webkit-user-select: none !important;
+                user-select: none !important;
+                -webkit-touch-callout: none !important;
+              }
+              .library-action-sheet,
+              .library-action-sheet * {
+                -webkit-user-select: none !important;
+                user-select: none !important;
+                -webkit-touch-callout: none !important;
               }
               @media (min-width: 520px) {
                 body {

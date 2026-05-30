@@ -1,16 +1,19 @@
 import 'react-native-gesture-handler';
+import 'react-native-reanimated';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { setupMockApi } from '@/api/setupMockApi';
 import FontLoader from '@/components/FontLoader';
 import MobilePreviewFrame from '@/components/MobilePreviewFrame';
-
-setupMockApi();
+import { hydrateDocumentStore } from '@/services/documentStore';
+import { colors } from '@/constants/theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +27,33 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        await hydrateDocumentStore();
+        setupMockApi();
+      } finally {
+        if (mounted) setReady(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvasMuted }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
@@ -37,7 +67,8 @@ export default function RootLayout() {
                   contentStyle: { backgroundColor: '#FFFFFF' },
                 }}
               >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen
                   name="capture"
                   options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

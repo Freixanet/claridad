@@ -11,9 +11,15 @@ import {
   Mail,
   Crown,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import {
+  getProcessingPreferences,
+  saveProcessingPreferences,
+} from '@/services/processingPreferences';
+import { usePlanMode } from '@/hooks/usePlanMode';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 type RowProps = {
   icon: React.ReactNode;
@@ -111,12 +117,33 @@ function Card({ children }: { children: React.ReactNode }) {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
+  const { isPro, setPlan } = usePlanMode();
   const [highFidelity, setHighFidelity] = useState(true);
   const [autoTitle, setAutoTitle] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const prefs = await getProcessingPreferences();
+      setHighFidelity(prefs.highFidelity);
+      setAutoTitle(prefs.autoTitle);
+    })();
+  }, []);
+
+  const updateHighFidelity = (value: boolean) => {
+    setHighFidelity(value);
+    void saveProcessingPreferences({ highFidelity: value, autoTitle });
+  };
+
+  const updateAutoTitle = (value: boolean) => {
+    setAutoTitle(value);
+    void saveProcessingPreferences({ highFidelity, autoTitle: value });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvasMuted }}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{
           flexGrow: 1,
@@ -182,10 +209,10 @@ export default function SettingsScreen() {
                   letterSpacing: -0.2,
                 }}
               >
-                Free plan
+                {isPro ? 'Claridad Pro' : 'Free plan'}
               </Text>
             </View>
-            <Pill label="3 / 5 left" variant="soft" />
+            <Pill label={isPro ? 'Active' : '3 / 5 left'} variant="soft" />
           </View>
           <Text
             style={{
@@ -196,28 +223,32 @@ export default function SettingsScreen() {
               lineHeight: 18,
             }}
           >
-            Unlock unlimited pages, multi-page documents, and high-fidelity organization with Pro.
+            {isPro
+              ? 'Unlimited pages, multi-page documents, and high-fidelity organization.'
+              : 'Unlock unlimited pages, multi-page documents, and high-fidelity organization with Pro.'}
           </Text>
-          <Pressable
-            style={({ pressed }) => ({
-              marginTop: 14,
-              backgroundColor: pressed ? '#F3F4F6' : '#FFFFFF',
-              borderRadius: radii.sm,
-              paddingVertical: 11,
-              alignItems: 'center',
-            })}
-          >
-            <Text
-              style={{
-                fontFamily: 'Inter_600SemiBold',
-                fontSize: 14,
-                color: colors.foreground,
-                letterSpacing: -0.2,
-              }}
+          {!isPro ? (
+            <Pressable
+              style={({ pressed }) => ({
+                marginTop: 14,
+                backgroundColor: pressed ? '#F3F4F6' : '#FFFFFF',
+                borderRadius: radii.sm,
+                paddingVertical: 11,
+                alignItems: 'center',
+              })}
             >
-              Upgrade to Pro
-            </Text>
-          </Pressable>
+              <Text
+                style={{
+                  fontFamily: 'Inter_600SemiBold',
+                  fontSize: 14,
+                  color: colors.foreground,
+                  letterSpacing: -0.2,
+                }}
+              >
+                Upgrade to Pro
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* Processing */}
@@ -231,7 +262,7 @@ export default function SettingsScreen() {
               trailing={
                 <Switch
                   value={highFidelity}
-                  onValueChange={setHighFidelity}
+                  onValueChange={updateHighFidelity}
                   trackColor={{ true: colors.primary, false: colors.borderGhost }}
                   thumbColor="#FFFFFF"
                 />
@@ -244,7 +275,7 @@ export default function SettingsScreen() {
               trailing={
                 <Switch
                   value={autoTitle}
-                  onValueChange={setAutoTitle}
+                  onValueChange={updateAutoTitle}
                   trackColor={{ true: colors.primary, false: colors.borderGhost }}
                   thumbColor="#FFFFFF"
                 />
@@ -291,13 +322,40 @@ export default function SettingsScreen() {
           </Card>
         </View>
 
+        <View
+          style={{
+            marginTop: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: 'Inter_400Regular',
+              fontSize: 11,
+              color: colors.foregroundSoft,
+            }}
+          >
+            Preview Pro
+          </Text>
+          <Switch
+            value={isPro}
+            onValueChange={(value) => void setPlan(value ? 'pro' : 'free')}
+            trackColor={{ true: colors.primary, false: colors.borderGhost }}
+            thumbColor="#FFFFFF"
+            style={{ transform: [{ scaleX: 0.72 }, { scaleY: 0.72 }] }}
+          />
+        </View>
+
         <Text
           style={{
             fontFamily: 'Inter_400Regular',
             fontSize: 11,
             color: colors.foregroundSoft,
             textAlign: 'center',
-            marginTop: 24,
+            marginTop: 10,
           }}
         >
           Claridad · v1.0.0

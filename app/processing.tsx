@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, Easing, Pressable } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Check, Loader, Sparkles, Layers, FileText, ShieldCheck } from 'lucide-react-native';
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
+import { clearPendingCaptureUri, consumePendingCaptureUri } from '@/services/pendingCapture';
+import { processDocument } from '@/services/documentStore';
+import { debugClientLog } from '@/utils/debugClientLog';
 
 type Stage = {
   key: string;
@@ -44,33 +47,16 @@ const STAGES: Stage[] = [
 export default function ProcessingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ image?: string }>();
-  const imageUrl = params.image ?? '';
+  const params = useLocalSearchParams<{ image?: string | string[] }>();
+  const paramImage = params.image;
+  const queryImage = Array.isArray(paramImage) ? paramImage[0] : paramImage;
+
+  const [imageUrl, setImageUrl] = useState(queryImage?.trim() ?? '');
 
   const [activeStage, setActiveStage] = useState(0);
   const [completedStages, setCompletedStages] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const pulseAnim = useRef(new Animated.Value(0)).current;
   const submittedRef = useRef(false);
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [pulseAnim]);
 
   useEffect(() => {
     // Stage progress simulation
@@ -87,50 +73,82 @@ export default function ProcessingScreen() {
   }, []);
 
   useEffect(() => {
+    if (queryImage?.trim()) {
+      setImageUrl(queryImage.trim());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const pending = await consumePendingCaptureUri();
+      if (cancelled) return;
+      if (pending?.trim()) {
+        setImageUrl(pending.trim());
+      } else {
+        setError('No se encontró la imagen a procesar. Vuelve a capturar.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryImage]);
+
+  useEffect(() => {
     if (!imageUrl || submittedRef.current) return;
     submittedRef.current = true;
 
     (async () => {
-      try {
-        const res = await fetch('/api/documents/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: imageUrl }),
-        });
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.error || `Failed (${res.status})`);
-        }
-        const data = await res.json();
-        const docId = data?.document?.id;
-        if (!docId) throw new Error('No document returned');
+      let createdDocId: number | null = null;
 
-        // Ensure minimum theatrical delay
+      try {
+        await debugClientLog('processing.tsx:start', 'processDocument starting', {
+          imageUrlLen: imageUrl.length,
+          imageUrlPrefix: imageUrl.slice(0, 28),
+        }, 'B');
+        const document = await processDocument(imageUrl);
+        createdDocId = document.id;
+
+        await clearPendingCaptureUri();
+
         await new Promise((r) => setTimeout(r, 800));
 
-        // Mark all stages complete
         setCompletedStages([0, 1, 2, 3]);
         setActiveStage(STAGES.length);
 
         setTimeout(() => {
-          router.replace(`/document/${docId}?fresh=1`);
+          router.replace(`/document/${createdDocId}?fresh=1`);
         }, 600);
       } catch (e) {
+        if (createdDocId) {
+          router.replace(`/document/${createdDocId}?fresh=1`);
+          return;
+        }
+
         console.error('Processing error:', e);
-        const msg = e instanceof Error ? e.message : 'Something went wrong';
+        await debugClientLog('processing.tsx:catch', 'processDocument failed', {
+          errorName: e instanceof Error ? e.name : 'unknown',
+          errorMessage: e instanceof Error ? e.message : String(e),
+          errorStack: e instanceof Error ? (e.stack ?? '').slice(0, 200) : null,
+        }, 'F');
+        const raw = e instanceof Error ? (e.message || e.stack || String(e)) : String(e);
+        let msg = raw.split('\n')[0] || 'Algo salió mal al procesar la foto.';
+        if (raw.includes('EXPO_PUBLIC_API_URL') || raw.includes('API no configurada')) {
+          msg = 'La API de procesamiento no está configurada. Añade EXPO_PUBLIC_API_URL.';
+        } else if (raw.includes('Failed to fetch') || raw.includes('Network request failed')) {
+          msg =
+            'No se pudo conectar al proxy. En local, ejecuta `npm run dev:api` en el Mac y usa la misma Wi‑Fi.';
+        } else if (raw.includes('image_url is required') || raw.includes('Could not read')) {
+          msg = 'No se pudo leer la imagen. Vuelve a capturar la foto.';
+        } else if (raw.includes('QuotaExceededError') || raw.includes('quota')) {
+          msg = 'La imagen es demasiado grande para guardar en el navegador. Prueba con otra foto.';
+        } else if (raw.includes('INVALID_ARGUMENT') || raw.includes('Unable to process input image')) {
+          msg = 'Gemini no pudo leer la imagen. Prueba con otra foto.';
+        } else if (raw.includes('processImageWithGemini') || raw.includes('entry.bundle')) {
+          msg = 'Error al procesar con Gemini. Comprueba que npm run dev:api está corriendo en el Mac.';
+        }
         setError(msg);
       }
     })();
   }, [imageUrl, router]);
-
-  const pulseOpacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.35, 1],
-  });
-  const pulseScale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.18],
-  });
 
   if (error) {
     return (
@@ -205,19 +223,24 @@ export default function ProcessingScreen() {
         flex: 1,
         backgroundColor: colors.canvasMuted,
         paddingTop: insets.top + 12,
-        paddingHorizontal: 20,
       }}
     >
-      {/* Top brand */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-        <Animated.View
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+        }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Top brand */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+        <View
           style={{
             width: 8,
             height: 8,
             borderRadius: 4,
             backgroundColor: colors.primary,
-            opacity: pulseOpacity,
-            transform: [{ scale: pulseScale }],
           }}
         />
         <Text
@@ -369,13 +392,7 @@ export default function ProcessingScreen() {
                 {isDone ? (
                   <Check color={colors.success} size={14} strokeWidth={2.5} />
                 ) : isActive ? (
-                  <Animated.View
-                    style={{
-                      opacity: pulseOpacity,
-                    }}
-                  >
-                    <Loader color={colors.primary} size={14} strokeWidth={2.4} />
-                  </Animated.View>
+                  <Loader color={colors.primary} size={14} strokeWidth={2.4} />
                 ) : (
                   stage.icon
                 )}
@@ -411,11 +428,9 @@ export default function ProcessingScreen() {
         })}
       </View>
 
-      <View style={{ flex: 1 }} />
-
       <View
         style={{
-          marginBottom: insets.bottom + 16,
+          marginTop: 24,
           alignItems: 'center',
         }}
       >
@@ -432,6 +447,7 @@ export default function ProcessingScreen() {
           mode.
         </Text>
       </View>
+      </ScrollView>
     </View>
   );
 }

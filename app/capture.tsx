@@ -27,6 +27,11 @@ import {
 import { colors, radii } from '@/constants/theme';
 import Pill from '@/components/Pill';
 import useUpload from '@/utils/useUpload';
+import { setPendingCaptureUri } from '@/services/pendingCapture';
+import { ensureStableImageUri } from '@/services/imageToBase64';
+import { compressDataUriForWeb } from '@/services/webImageCache';
+import { goBackOr } from '@/utils/navigation';
+import { useScrollViewsToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 type Step = 'intent' | 'preview';
 
@@ -38,6 +43,7 @@ export default function CaptureScreen() {
   const [busy, setBusy] = useState(false);
   const [upload] = useUpload();
   const submittingRef = useRef(false);
+  const assignScrollRef = useScrollViewsToTopOnFocus<Step>();
 
   const pickFromCamera = useCallback(async () => {
     try {
@@ -53,6 +59,7 @@ export default function CaptureScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.85,
+        base64: Platform.OS === 'web',
       });
       if (!result.canceled && result.assets[0]) {
         if (Platform.OS !== 'web') {
@@ -73,6 +80,7 @@ export default function CaptureScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.85,
+        base64: Platform.OS === 'web',
       });
       if (!result.canceled && result.assets[0]) {
         if (Platform.OS !== 'web') {
@@ -96,7 +104,12 @@ export default function CaptureScreen() {
       if ('error' in uploaded || !uploaded.url) {
         throw new Error(uploaded.error ?? 'Upload failed');
       }
-      router.replace(`/processing?image=${encodeURIComponent(uploaded.url)}`);
+      const stableUri =
+        Platform.OS === 'web'
+          ? await compressDataUriForWeb(await ensureStableImageUri(uploaded.url))
+          : uploaded.url;
+      await setPendingCaptureUri(stableUri);
+      router.replace('/processing');
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload failed', error instanceof Error ? error.message : 'Please try again.');
@@ -106,7 +119,7 @@ export default function CaptureScreen() {
   }, [selectedAsset, upload, router]);
 
   const handleClose = useCallback(() => {
-    router.back();
+    goBackOr(router, '/');
   }, [router]);
 
   if (step === 'preview' && selectedAsset) {
@@ -175,6 +188,7 @@ export default function CaptureScreen() {
         </View>
 
         <ScrollView
+          ref={assignScrollRef('preview')}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 120 }}
           showsVerticalScrollIndicator={false}
@@ -408,6 +422,7 @@ export default function CaptureScreen() {
       </View>
 
       <ScrollView
+        ref={assignScrollRef('intent')}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}

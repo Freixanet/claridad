@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/documents/process.ts": {
+      "maxDuration": 60
+    }
+  }
+}

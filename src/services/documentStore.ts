@@ -1,25 +1,18 @@
-export type Section = {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  items: string[];
-  source_excerpt: string;
-};
+import { processImageWithGemini } from '@/services/geminiProcess';
+import { persistImage } from '@/services/documentPersistence';
+import { getProcessingPreferences } from '@/services/processingPreferences';
+import {
+  getDocuments,
+  loadNextDocumentId,
+  replaceDocuments,
+  saveDocument,
+  saveNextDocumentId,
+  type StoredDocument,
+  type StoredSection,
+} from '@/storage/documents';
 
-export type DocumentRow = {
-  id: number;
-  title: string;
-  source_image_url: string;
-  raw_transcription: string;
-  sections: Section[];
-  topic_count: number;
-  word_count: number;
-  status: string;
-  pinned: boolean;
-  created_at: string;
-  updated_at: string;
-};
+export type Section = StoredSection;
+export type DocumentRow = StoredDocument;
 
 function countWords(sections: Section[]): number {
   return sections.reduce((acc, s) => {
@@ -66,6 +59,7 @@ const seedDocuments: DocumentRow[] = [
     word_count: 0,
     status: 'ready',
     pinned: true,
+    archived: false,
     created_at: '2026-05-28T14:30:00.000Z',
     updated_at: '2026-05-28T14:30:00.000Z',
   },
@@ -88,6 +82,7 @@ const seedDocuments: DocumentRow[] = [
     word_count: 0,
     status: 'ready',
     pinned: false,
+    archived: false,
     created_at: '2026-05-27T09:15:00.000Z',
     updated_at: '2026-05-27T09:15:00.000Z',
   },
@@ -118,6 +113,7 @@ const seedDocuments: DocumentRow[] = [
     word_count: 0,
     status: 'ready',
     pinned: false,
+    archived: false,
     created_at: '2026-05-25T18:00:00.000Z',
     updated_at: '2026-05-25T18:00:00.000Z',
   },
@@ -129,9 +125,34 @@ seedDocuments.forEach((doc) => {
 
 let documents = [...seedDocuments];
 let nextId = 4;
+let hydrated = false;
+
+async function persistDocuments(): Promise<void> {
+  await replaceDocuments(documents);
+  await saveNextDocumentId(nextId);
+}
+
+export async function hydrateDocumentStore(): Promise<void> {
+  if (hydrated) return;
+
+  const persisted = await getDocuments();
+  const persistedNextId = await loadNextDocumentId();
+
+  if (persisted.length > 0) {
+    documents = persisted.map((doc) => ({
+      ...doc,
+      archived: doc.archived ?? false,
+    }));
+    nextId = persistedNextId ?? documents.length + 1;
+  } else {
+    await persistDocuments();
+  }
+
+  hydrated = true;
+}
 
 export function listDocuments(params: { search?: string; pinned?: boolean }): DocumentRow[] {
-  let result = [...documents];
+  let result = documents.filter((d) => !d.archived);
 
   if (params.pinned) {
     result = result.filter((d) => d.pinned);
@@ -162,7 +183,10 @@ export function getDocument(id: number): DocumentRow | undefined {
   return documents.find((d) => d.id === id);
 }
 
-export function updateDocument(id: number, patch: Partial<Pick<DocumentRow, 'title' | 'pinned' | 'sections'>>): DocumentRow | undefined {
+export function updateDocument(
+  id: number,
+  patch: Partial<Pick<DocumentRow, 'title' | 'pinned' | 'archived' | 'sections'>>
+): DocumentRow | undefined {
   const idx = documents.findIndex((d) => d.id === id);
   if (idx === -1) return undefined;
 
@@ -177,49 +201,45 @@ export function updateDocument(id: number, patch: Partial<Pick<DocumentRow, 'tit
     updated_at: new Date().toISOString(),
   };
   documents[idx] = updated;
+  void persistDocuments();
   return updated;
 }
 
 export function deleteDocument(id: number): boolean {
   const before = documents.length;
   documents = documents.filter((d) => d.id !== id);
-  return documents.length < before;
+  if (documents.length < before) {
+    void persistDocuments();
+    return true;
+  }
+  return false;
 }
 
-export function processDocument(imageUrl: string): DocumentRow {
-  const sections: Section[] = [
-    {
-      id: 'captured-1',
-      title: 'Captured notes',
-      category: 'notes',
-      content: 'Your handwritten page has been read and organized into this section.',
-      items: [],
-      source_excerpt: 'From your photograph',
-    },
-    {
-      id: 'captured-2',
-      title: 'Action items',
-      category: 'tasks',
-      content: '',
-      items: ['Review the organized sections', 'Verify fidelity in Review mode'],
-      source_excerpt: 'Detected from page',
-    },
-  ];
+export async function processDocument(imageUrl: string): Promise<DocumentRow> {
+  const prefs = await getProcessingPreferences();
+  const persistentImageUrl = await persistImage(imageUrl);
+  const geminiResult = await processImageWithGemini(imageUrl, {
+    highFidelity: prefs.highFidelity,
+    autoTitle: prefs.autoTitle,
+  });
 
   const doc: DocumentRow = {
     id: nextId++,
-    title: 'New organized page',
-    source_image_url: imageUrl,
-    raw_transcription: 'Handwritten content from your captured page.',
-    sections,
-    topic_count: sections.length,
-    word_count: countWords(sections),
+    title: geminiResult.title,
+    source_image_url: persistentImageUrl,
+    raw_transcription: geminiResult.raw_transcription,
+    sections: geminiResult.sections,
+    topic_count: geminiResult.sections.length,
+    word_count: countWords(geminiResult.sections),
     status: 'ready',
     pinned: false,
+    archived: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   documents = [doc, ...documents];
+  await persistDocuments();
+  await saveNextDocumentId(nextId);
   return doc;
 }
